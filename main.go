@@ -4,19 +4,21 @@ import (
 	// "encoding/json"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/raft"
-	"github.com/hashicorp/raft-boltdb"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"time"
+
+	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
 type Config struct {
-	Bind    string `json:bind`
-	DataDir string `json:data_dir`
+	Bind    string `json:"bind"`
+	DataDir string `json:"data_dir"`
+	LocalID string `json:"local_id"`
 }
 
 type Word struct {
@@ -80,18 +82,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	peers := make([]string, 0, 10)
 
-	peers = raft.AddUniquePeer(peers, "192.168.78.151:12345")
-	peers = raft.AddUniquePeer(peers, "192.168.78.151:12346")
-	peers = raft.AddUniquePeer(peers, "192.168.78.151:12347")
+	cfg.LocalID = raft.ServerID(v.LocalID)
+	r, err := raft.NewRaft(cfg, fsm, dbStore, dbStore, fileStore, trans)
+	if err != nil {
+		fmt.Println("NewRaft error:")
+		log.Fatal(err)
+	}
+	configuration := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				ID:      raft.ServerID("6"),
+				Address: raft.ServerAddress("127.0.0.1:12346"),
+			},
+			{
+				ID:      raft.ServerID("7"),
+				Address: raft.ServerAddress("127.0.0.1:12347"),
+			},
+			{
+				ID:      raft.ServerID("5"),
+				Address: raft.ServerAddress("127.0.0.1:12345"),
+			},
+		},
+	}
+	r.BootstrapCluster(configuration)
 
-	peerStore := raft.NewJSONPeers(dataDir, trans)
-	peerStore.SetPeers(peers)
-
-	r, err := raft.NewRaft(cfg, fsm, dbStore, dbStore, fileStore, peerStore, trans)
-
-	t := time.NewTicker(time.Duration(1) * time.Second)
+	t := time.NewTicker(time.Duration(10) * time.Second)
 
 	for {
 		select {

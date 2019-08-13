@@ -7,6 +7,7 @@ Create a `config.json` of the following:
 ```
 {
   "bind": "192.168.78.151:12345",
+  "local_id": "5",
   "data_dir": "/tmp/raft"
 }
 ```
